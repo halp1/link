@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "HALP/LINK",
+  "short_name": "HALP/LINK",
+  "description": "Private link shortener and redirect tracker.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0e0e0e",
+  "theme_color": "#161616",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

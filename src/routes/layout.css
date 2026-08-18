@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-accent: #c8f56a;
+  --color-bg: #0e0e0e;
+  --color-surface: #161616;
+  --color-border: #2a2a2a;
+  --color-text: #f0ede6;
+  --color-muted: #666666;
+  --color-input-bg: #111111;
+  --font-family-heading: "Anta", sans-serif;
+  --font-family-mono: "DM Mono", monospace;
+}
+
+:root {
+  --bg: #0e0e0e;
+  --surface: #161616;
+  --border: #2a2a2a;
+  --accent: #c8f56a;
+  --text: #f0ede6;
+  --muted: #666666;
+  --input-bg: #111111;
+  --font-heading: "Anta", sans-serif;
+
+  /* Safe-area insets — 0 everywhere except notched devices / standalone PWA. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  color-scheme: dark;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DM Mono", monospace;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* App-like: no rubber-band / pull-to-refresh bouncing the whole shell. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fills the visible viewport, tracking mobile browser chrome as it hides. */
+.h-app {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Chrome (bars, drawers, sheets) should never look like selectable text on
+   touch, but file names and previewed content still must be selectable. */
+.app-chrome {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (pointer: coarse) {
+  /* Kills the 300ms tap delay and stray double-tap zoom on controls. */
+  button,
+  a,
+  [role="button"],
+  [role="row"] {
+    touch-action: manipulation;
+  }
+}
+
+.safe-top {
+  padding-top: var(--safe-top);
+}
+
+.safe-bottom {
+  padding-bottom: var(--safe-bottom);
+}
+
+.safe-x {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* --- Window Controls Overlay ------------------------------------------
+   When the installed desktop app runs in WCO mode the OS titlebar is gone
+   and the page paints all the way to the top of the window, with only the
+   close/minimise/maximise buttons floating above it. The app header then
+   has to double as the titlebar: drag the window, and keep its contents
+   clear of the buttons — which sit to the LEFT of the titlebar area on
+   macOS and to its RIGHT on Windows. `titlebar-area-*` describes exactly
+   the strip we are allowed to use, so the row is pinned to it rather than
+   being hand-tuned per platform. Nothing here applies outside WCO. */
+@media (display-mode: window-controls-overlay) {
+  .titlebar {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  /* Only the bar's empty space drags; its controls stay clickable. */
+  .titlebar button,
+  .titlebar a,
+  .titlebar input,
+  .titlebar form,
+  .titlebar [role="button"] {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  /* The header keeps its full-width background so the strip behind the
+     window buttons matches the bar; only the content row is inset. */
+  .titlebar-row {
+    margin-left: env(titlebar-area-x, 0px);
+    width: env(titlebar-area-width, 100%);
+    min-height: env(titlebar-area-height, 0px);
+  }
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(200, 245, 106, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 245, 106, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

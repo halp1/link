@@ -1,0 +1,3 @@
+# allow crawling nothing by default
+User-agent: *
+Disallow: *
