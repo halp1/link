@@ -3,6 +3,7 @@ import { redirect } from "@sveltejs/kit";
 import { statements } from "$lib/db";
 import { isValidCode } from "$lib/short-code";
 import { errorPageHtml, redirectPageHtml } from "$lib/redirect-html";
+import { getClientIp } from "$lib/client-ip";
 import type { StatusCode } from "$lib/db/types";
 
 export const GET: RequestHandler = async ({ params, request, getClientAddress }) => {
@@ -33,7 +34,7 @@ export const GET: RequestHandler = async ({ params, request, getClientAddress })
     );
   }
 
-  const ip = getClientAddress();
+  const ip = getClientIp(request, getClientAddress);
   const userAgent = request.headers.get("user-agent");
   const referer = request.headers.get("referer");
 

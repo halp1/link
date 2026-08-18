@@ -23,7 +23,8 @@ RUN bun run build
 FROM node:22-bookworm-slim
 
 WORKDIR /app
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+  ADDRESS_HEADER=cf-connecting-ip
 
 COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
