@@ -187,10 +187,83 @@ export const createOidcClient = (opts: OidcOptions) => {
       if (!verifier || !expectedState) redirect(302, "/auth");
 
       const config = await getConfig();
-      const tokens = await client.authorizationCodeGrant(config, event.url, {
-        pkceCodeVerifier: verifier,
-        expectedState
+      // #region agent log
+      fetch("http://127.0.0.1:7463/ingest/99b961e4-51b9-416e-ade2-b03d0c14722d", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "1bf785" },
+        body: JSON.stringify({
+          sessionId: "1bf785",
+          runId: "run1",
+          hypothesisId: "H2",
+          location: "link/src/lib/oidc.ts:handleCallback:entry",
+          message: "callback start before token grant",
+          data: {
+            hasVerifier: Boolean(verifier),
+            hasState: Boolean(expectedState),
+            callbackOrigin: event.url.origin,
+            redirectOrigin: new URL(opts.redirectUri).origin,
+            issuerHost: new URL(opts.issuer).host
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      console.error("[debug-1bf785] callback start", {
+        hasVerifier: Boolean(verifier),
+        hasState: Boolean(expectedState),
+        callbackOrigin: event.url.origin,
+        issuerHost: new URL(opts.issuer).host
       });
+      // #endregion
+      let tokens;
+      try {
+        tokens = await client.authorizationCodeGrant(config, event.url, {
+          pkceCodeVerifier: verifier,
+          expectedState
+        });
+      } catch (err) {
+        const cause = err instanceof Error ? err.cause : undefined;
+        const res = cause instanceof Response ? cause : undefined;
+        let bodySnippet = "";
+        if (res) {
+          try {
+            bodySnippet = (await res.clone().text()).slice(0, 240);
+          } catch {
+            bodySnippet = "unreadable";
+          }
+        }
+        // #region agent log
+        fetch("http://127.0.0.1:7463/ingest/99b961e4-51b9-416e-ade2-b03d0c14722d", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "1bf785" },
+          body: JSON.stringify({
+            sessionId: "1bf785",
+            runId: "run1",
+            hypothesisId: "H1",
+            location: "link/src/lib/oidc.ts:handleCallback:grant-error",
+            message: "authorizationCodeGrant failed",
+            data: {
+              errName: err instanceof Error ? err.name : typeof err,
+              errMessage: err instanceof Error ? err.message : String(err),
+              status: res?.status ?? 0,
+              contentType: res?.headers.get("content-type") ?? "",
+              location: res?.headers.get("location") ?? "",
+              resUrl: res?.url ?? "",
+              bodySnippet
+            },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        console.error("[debug-1bf785] grant failed", {
+          errMessage: err instanceof Error ? err.message : String(err),
+          status: res?.status ?? 0,
+          contentType: res?.headers.get("content-type") ?? "",
+          location: res?.headers.get("location") ?? "",
+          resUrl: res?.url ?? "",
+          bodySnippet
+        });
+        // #endregion
+        throw err;
+      }
       const sub = tokens.claims()?.sub;
       if (!sub || !tokens.access_token) redirect(302, "/auth");
 
