@@ -56,27 +56,34 @@ const writeStored = (filePath: string, creds: StoredClient) => {
 
 const originOf = (redirectUri: string): string => new URL(redirectUri).origin;
 
-export const registerIfNeeded = async (
-  opts: RegisterIfNeededOptions
-): Promise<RegisteredClient> => {
-  if (opts.envClientId && opts.envClientSecret) {
-    return {
-      issuer: opts.issuer,
-      clientId: opts.envClientId,
-      clientSecret: opts.envClientSecret,
-      redirectUri: opts.redirectUri
-    };
+const storedClientStillExists = async (
+  issuer: string,
+  clientId: string,
+  dcrToken: string
+): Promise<boolean> => {
+  const statusUrl = `${new URL(issuer).origin}/api/oidc/clients/${encodeURIComponent(clientId)}`;
+  try {
+    const response = await fetch(statusUrl, {
+      headers: { Authorization: `Bearer ${dcrToken}` }
+    });
+    if (response.status === 401) {
+      throw new Error("AUTH_DCR_TOKEN was rejected by auth");
+    }
+    if (response.status === 404) return false;
+    if (!response.ok) {
+      console.warn(`[oidc] client status ${response.status} at ${statusUrl}; keeping stored client`);
+      return true;
+    }
+    const payload = (await response.json()) as { exists?: boolean };
+    return payload.exists === true;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("AUTH_DCR_TOKEN")) throw err;
+    console.warn(`[oidc] client status failed; keeping stored client`, err);
+    return true;
   }
+};
 
-  const stored = readStored(opts.credentialsPath);
-  if (
-    stored &&
-    stored.issuer === opts.issuer &&
-    stored.redirectUri === opts.redirectUri
-  ) {
-    return stored;
-  }
-
+const registerClient = async (opts: RegisterIfNeededOptions): Promise<StoredClient> => {
   if (!opts.dcrToken) {
     throw new Error("Set AUTH_DCR_TOKEN or AUTH_CLIENT_ID and AUTH_CLIENT_SECRET");
   }
@@ -133,7 +140,36 @@ export const registerIfNeeded = async (
     redirectUri: opts.redirectUri
   };
   writeStored(opts.credentialsPath, creds);
+  console.log(`[oidc] registered ${opts.clientName} as ${creds.clientId}`);
   return creds;
+};
+
+export const registerIfNeeded = async (
+  opts: RegisterIfNeededOptions
+): Promise<RegisteredClient> => {
+  if (opts.envClientId && opts.envClientSecret) {
+    return {
+      issuer: opts.issuer,
+      clientId: opts.envClientId,
+      clientSecret: opts.envClientSecret,
+      redirectUri: opts.redirectUri
+    };
+  }
+
+  const stored = readStored(opts.credentialsPath);
+  if (
+    stored &&
+    stored.issuer === opts.issuer &&
+    stored.redirectUri === opts.redirectUri
+  ) {
+    if (!opts.dcrToken || (await storedClientStillExists(opts.issuer, stored.clientId, opts.dcrToken))) {
+      console.log(`[oidc] using stored client ${stored.clientId}`);
+      return stored;
+    }
+    console.warn(`[oidc] stored client ${stored.clientId} is not in auth; re-registering`);
+  }
+
+  return registerClient(opts);
 };
 
 const cookieBase = (secure: boolean, maxAge: number) => ({
@@ -187,83 +223,10 @@ export const createOidcClient = (opts: OidcOptions) => {
       if (!verifier || !expectedState) redirect(302, "/auth");
 
       const config = await getConfig();
-      // #region agent log
-      fetch("http://127.0.0.1:7463/ingest/99b961e4-51b9-416e-ade2-b03d0c14722d", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "1bf785" },
-        body: JSON.stringify({
-          sessionId: "1bf785",
-          runId: "run1",
-          hypothesisId: "H2",
-          location: "link/src/lib/oidc.ts:handleCallback:entry",
-          message: "callback start before token grant",
-          data: {
-            hasVerifier: Boolean(verifier),
-            hasState: Boolean(expectedState),
-            callbackOrigin: event.url.origin,
-            redirectOrigin: new URL(opts.redirectUri).origin,
-            issuerHost: new URL(opts.issuer).host
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      console.error("[debug-1bf785] callback start", {
-        hasVerifier: Boolean(verifier),
-        hasState: Boolean(expectedState),
-        callbackOrigin: event.url.origin,
-        issuerHost: new URL(opts.issuer).host
+      const tokens = await client.authorizationCodeGrant(config, event.url, {
+        pkceCodeVerifier: verifier,
+        expectedState
       });
-      // #endregion
-      let tokens;
-      try {
-        tokens = await client.authorizationCodeGrant(config, event.url, {
-          pkceCodeVerifier: verifier,
-          expectedState
-        });
-      } catch (err) {
-        const cause = err instanceof Error ? err.cause : undefined;
-        const res = cause instanceof Response ? cause : undefined;
-        let bodySnippet = "";
-        if (res) {
-          try {
-            bodySnippet = (await res.clone().text()).slice(0, 240);
-          } catch {
-            bodySnippet = "unreadable";
-          }
-        }
-        // #region agent log
-        fetch("http://127.0.0.1:7463/ingest/99b961e4-51b9-416e-ade2-b03d0c14722d", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "1bf785" },
-          body: JSON.stringify({
-            sessionId: "1bf785",
-            runId: "run1",
-            hypothesisId: "H1",
-            location: "link/src/lib/oidc.ts:handleCallback:grant-error",
-            message: "authorizationCodeGrant failed",
-            data: {
-              errName: err instanceof Error ? err.name : typeof err,
-              errMessage: err instanceof Error ? err.message : String(err),
-              status: res?.status ?? 0,
-              contentType: res?.headers.get("content-type") ?? "",
-              location: res?.headers.get("location") ?? "",
-              resUrl: res?.url ?? "",
-              bodySnippet
-            },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        console.error("[debug-1bf785] grant failed", {
-          errMessage: err instanceof Error ? err.message : String(err),
-          status: res?.status ?? 0,
-          contentType: res?.headers.get("content-type") ?? "",
-          location: res?.headers.get("location") ?? "",
-          resUrl: res?.url ?? "",
-          bodySnippet
-        });
-        // #endregion
-        throw err;
-      }
       const sub = tokens.claims()?.sub;
       if (!sub || !tokens.access_token) redirect(302, "/auth");
 
