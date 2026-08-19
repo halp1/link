@@ -204,7 +204,7 @@ export const createOidcClient = (opts: OidcOptions) => {
       new URL(opts.issuer),
       opts.clientId,
       opts.clientSecret,
-      undefined,
+      client.ClientSecretBasic(opts.clientSecret),
       opts.issuer.startsWith("http://") ? { execute: [client.allowInsecureRequests] } : undefined
     );
     return configPromise;
