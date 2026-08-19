@@ -180,6 +180,22 @@ const cookieBase = (secure: boolean, maxAge: number) => ({
   maxAge
 });
 
+const authorizationResponseUrl = (event: RequestEvent, redirectUri: string): URL => {
+  const url = new URL(redirectUri);
+  url.search = event.url.search;
+  return url;
+};
+
+const oauthErrorLog = (err: unknown) => {
+  if (!err || typeof err !== "object") return;
+  const body = err as { error?: string; error_description?: string; status?: number };
+  if (typeof body.error === "string") {
+    console.error(
+      `[oidc] token exchange failed ${body.status ?? ""} ${body.error} ${body.error_description ?? ""}`.trim()
+    );
+  }
+};
+
 export const createOidcClient = (opts: OidcOptions) => {
   let configPromise: Promise<client.Configuration> | null = null;
 
@@ -194,7 +210,8 @@ export const createOidcClient = (opts: OidcOptions) => {
     return configPromise;
   };
 
-  const isSecure = (event: RequestEvent) => event.url.protocol === "https:";
+  const isSecure = (event: RequestEvent) =>
+    event.url.protocol === "https:" || opts.redirectUri.startsWith("https:");
 
   return {
     startLogin: async (event: RequestEvent) => {
@@ -223,10 +240,16 @@ export const createOidcClient = (opts: OidcOptions) => {
       if (!verifier || !expectedState) redirect(302, "/auth");
 
       const config = await getConfig();
-      const tokens = await client.authorizationCodeGrant(config, event.url, {
-        pkceCodeVerifier: verifier,
-        expectedState
-      });
+      let tokens;
+      try {
+        tokens = await client.authorizationCodeGrant(config, authorizationResponseUrl(event, opts.redirectUri), {
+          pkceCodeVerifier: verifier,
+          expectedState
+        });
+      } catch (err) {
+        oauthErrorLog(err);
+        throw err;
+      }
       const sub = tokens.claims()?.sub;
       if (!sub || !tokens.access_token) redirect(302, "/auth");
 
