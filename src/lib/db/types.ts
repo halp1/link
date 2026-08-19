@@ -1,9 +1,3 @@
-export interface User {
-  id: number;
-  username: string;
-  password_hash: string;
-}
-
 export type RedirectMode = "direct" | "page";
 export type StatusCode = 301 | 302 | 307;
 

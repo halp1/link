@@ -1,12 +1,12 @@
-import type { JwtUser } from "$lib/jwt";
+import type { SessionUser } from "$lib/session";
 
 declare global {
   namespace App {
     interface Locals {
-      user: JwtUser | null;
+      user: SessionUser | null;
     }
     interface PageData {
-      user: JwtUser | null;
+      user: SessionUser | null;
     }
   }
 }

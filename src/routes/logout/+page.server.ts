@@ -1,9 +1,10 @@
-import { redirect } from "@sveltejs/kit";
+import { getOidc } from "$lib/oidc-client";
 import type { Actions } from "./$types";
 
 export const actions: Actions = {
-  default: async ({ cookies }) => {
-    cookies.delete("token", { path: "/" });
-    redirect(302, "/auth");
+  default: async (event) => {
+    event.cookies.delete("token", { path: "/" });
+    const oidc = await getOidc();
+    await oidc.logout(event);
   }
 };

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import type { User, Link, Hit, CountRow } from "./types";
+import type { Link, Hit, CountRow } from "./types";
 
 export * from "./types";
 
@@ -27,12 +27,6 @@ if (globalThis.__db) {
 }
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS links (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
@@ -54,20 +48,17 @@ db.exec(`
     created_at INTEGER DEFAULT (strftime('%s', 'now'))
   );
 
-  CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
   CREATE INDEX IF NOT EXISTS idx_links_code ON links (code);
   CREATE INDEX IF NOT EXISTS idx_links_expires_at ON links (expires_at);
   CREATE INDEX IF NOT EXISTS idx_hits_link_id ON hits (link_id);
   CREATE INDEX IF NOT EXISTS idx_hits_created_at ON hits (created_at);
 `);
 
+db.exec("DROP TABLE IF EXISTS users");
+
 export { db };
 
 export interface Statements {
-  createUser: Database.Statement<[string, string], void>;
-  getUserByUsername: Database.Statement<[string], User | undefined>;
-  getUserCount: Database.Statement<[], CountRow>;
-
   createLink: Database.Statement<
     [string, string, string, number, number | null, number],
     void
@@ -87,14 +78,6 @@ export interface Statements {
 }
 
 export const statements = {
-  createUser: db.prepare<[string, string], void>(
-    "INSERT INTO users (username, password_hash) VALUES (?, ?)"
-  ),
-  getUserByUsername: db.prepare<[string], User>(
-    "SELECT * FROM users WHERE username = ?"
-  ),
-  getUserCount: db.prepare<[], CountRow>("SELECT COUNT(*) as count FROM users"),
-
   createLink: db.prepare<
     [string, string, string, number, number | null, number],
     void
