@@ -1,6 +1,5 @@
-import path from "node:path";
 import { env } from "$env/dynamic/private";
-import { createOidcClient, registerIfNeeded } from "./oidc";
+import { createOidcClient } from "./oidc";
 
 const required = (key: string): string => {
   const value = env[key];
@@ -22,22 +21,12 @@ export const getOidc = (): Promise<OidcRp> => {
       throw new Error("Set AUTH_REDIRECT_URI or PUBLIC_BASE_URL");
     }
 
-    const creds = await registerIfNeeded({
-      issuer,
-      softwareId: "link",
-      clientName: "HALP/LINK",
-      redirectUri,
-      credentialsPath: path.join(process.cwd(), "data", "oidc-client.json"),
-      dcrToken: env.AUTH_DCR_TOKEN,
-      envClientId: env.AUTH_CLIENT_ID,
-      envClientSecret: env.AUTH_CLIENT_SECRET
-    });
-
+    // Registered by hand in auth under Admin / Clients — this app no longer registers itself.
     return createOidcClient({
-      issuer: creds.issuer,
-      clientId: creds.clientId,
-      clientSecret: creds.clientSecret,
-      redirectUri: creds.redirectUri,
+      issuer,
+      clientId: required("AUTH_CLIENT_ID"),
+      clientSecret: required("AUTH_CLIENT_SECRET"),
+      redirectUri,
       sessionSecret
     });
   })();
