@@ -30,6 +30,11 @@ RUN bun run build
 
 FROM node:22-bookworm-slim
 
+# Coolify's healthcheck shells out to curl (then wget); the slim image has neither
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 ENV NODE_ENV=production \
   ADDRESS_HEADER=cf-connecting-ip \
